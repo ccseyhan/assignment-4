@@ -1,0 +1,332 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {},
+    "functions": [],
+    "variables": {
+        "Windows VMs name": "ccseyhanwvm",
+        "Ubuntu Vms name": "uccseyhansvm",
+        "Both VMs user name": "ccseyhan",
+        "Both Vms password": "Ccseyhan1234"
+    },
+    "resources": [{
+        "name": "[toLower('ccseyhanwvmstorage')]",
+        "type": "Microsoft.Storage/storageAccounts",
+        "apiVersion": "2021-04-01",
+        "location": "[resourceGroup().location]",
+        "tags": {
+            "displayName": "ccseyhanwvm Storage Account"
+        },
+        "sku": {
+            "name": "Standard_LRS"
+        },
+        "kind": "Storage"
+    },
+    {
+        "name": "ccseyhanwvm-PublicIP",
+        "type": "Microsoft.Network/publicIPAddresses",
+        "apiVersion": "2020-11-01",
+        "location": "[resourceGroup().location]",
+        "tags": {
+            "displayName": "PublicIPAddress"
+        },
+        "properties": {
+            "publicIPAllocationMethod": "Dynamic",
+            "dnsSettings": {
+                "domainNameLabel": "[toLower('ccseyhanwvm')]"
+            }
+        }
+    },
+    {
+        "name": "ccseyhanwvm-nsg",
+        "type": "Microsoft.Network/networkSecurityGroups",
+        "apiVersion": "2020-11-01",
+        "location": "[resourceGroup().location]",
+        "properties": {
+            "securityRules": [
+                {
+                    "name": "nsgRule1",
+                    "properties": {
+                        "description": "description",
+                        "protocol": "Tcp",
+                        "sourcePortRange": "*",
+                        "destinationPortRange": "3389",
+                        "sourceAddressPrefix": "*",
+                        "destinationAddressPrefix": "*",
+                        "access": "Allow",
+                        "priority": 100,
+                        "direction": "Inbound"
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "name": "ccseyhanwvm-VirtualNetwork",
+        "type": "Microsoft.Network/virtualNetworks",
+        "apiVersion": "2020-11-01",
+        "location": "[resourceGroup().location]",
+        "dependsOn": [
+            "[resourceId('Microsoft.Network/networkSecurityGroups', 'ccseyhanwvm-nsg')]"
+        ],
+        "tags": {
+            "displayName": "ccseyhanwvm-VirtualNetwork"
+        },
+        "properties": {
+            "addressSpace": {
+                "addressPrefixes": [
+                    "10.0.0.0/16"
+                ]
+            },
+            "subnets": [
+                {
+                    "name": "ccseyhanwvm-VirtualNetwork-Subnet",
+                    "properties": {
+                        "addressPrefix": "10.0.0.0/24",
+                        "networkSecurityGroup": {
+                            "id": "[resourceId('Microsoft.Network/networkSecurityGroups', 'ccseyhanwvm-nsg')]"
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "name": "ccseyhanwvm-NetworkInterface",
+        "type": "Microsoft.Network/networkInterfaces",
+        "apiVersion": "2020-11-01",
+        "location": "[resourceGroup().location]",
+        "dependsOn": [
+            "[resourceId('Microsoft.Network/publicIPAddresses', 'ccseyhanwvm-PublicIP')]",
+            "[resourceId('Microsoft.Network/virtualNetworks', 'ccseyhanwvm-VirtualNetwork')]"
+        ],
+        "tags": {
+            "displayName": "ccseyhanwvm Network Interface"
+        },
+        "properties": {
+            "ipConfigurations": [
+                {
+                    "name": "ipConfig1",
+                    "properties": {
+                        "privateIPAllocationMethod": "Dynamic",
+                        "publicIPAddress": {
+                            "id": "[resourceId('Microsoft.Network/publicIPAddresses', 'ccseyhanwvm-PublicIP')]"
+                        },
+                        "subnet": {
+                            "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', 'ccseyhanwvm-VirtualNetwork', 'ccseyhanwvm-VirtualNetwork-Subnet')]"
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "name": "[variables('Windows VMs name')]",
+        "type": "Microsoft.Compute/virtualMachines",
+        "apiVersion": "2021-03-01",
+        "location": "[resourceGroup().location]",
+        "dependsOn": [
+            "[resourceId('Microsoft.Storage/storageAccounts', toLower('ccseyhanwvmstorage'))]",
+            "[resourceId('Microsoft.Network/networkInterfaces', 'ccseyhanwvm-NetworkInterface')]"
+        ],
+        "tags": {
+            "displayName": "[variables('Windows VMs name')]"
+        },
+        "properties": {
+            "hardwareProfile": {
+                "vmSize": "Standard_A2_v2"
+            },
+            "osProfile": {
+                "computerName": "[variables('Windows VMs name')]",
+                "adminUsername": "[variables('Both VMs user name')]",
+                "adminPassword": "[variables('Both Vms password')]"
+            },
+            "storageProfile": {
+                "imageReference": {
+                    "publisher": "MicrosoftWindowsServer",
+                    "offer": "WindowsServer",
+                    "sku": "2012-R2-Datacenter",
+                    "version": "latest"
+                },
+                "osDisk": {
+                    "name": "ccseyhanwvmOSDisk",
+                    "caching": "ReadWrite",
+                    "createOption": "FromImage"
+                }
+            },
+            "networkProfile": {
+                "networkInterfaces": [
+                    {
+                        "id": "[resourceId('Microsoft.Network/networkInterfaces', 'ccseyhanwvm-NetworkInterface')]"
+                    }
+                ]
+            },
+            "diagnosticsProfile": {
+                "bootDiagnostics": {
+                    "enabled": true,
+                    "storageUri": "[reference(resourceId('Microsoft.Storage/storageAccounts/', toLower('ccseyhanwvmstorage'))).primaryEndpoints.blob]"
+                }
+            }
+        }
+    },
+    {
+        "name": "[toLower('uccseyhansvmstorage')]",
+        "type": "Microsoft.Storage/storageAccounts",
+        "apiVersion": "2021-04-01",
+        "location": "[resourceGroup().location]",
+        "tags": {
+            "displayName": "uccseyhansvm Storage Account"
+        },
+        "sku": {
+            "name": "Standard_LRS"
+        },
+        "kind": "Storage"
+    },
+    {
+        "name": "uccseyhansvm-PublicIP",
+        "type": "Microsoft.Network/publicIPAddresses",
+        "apiVersion": "2020-11-01",
+        "location": "[resourceGroup().location]",
+        "tags": {
+            "displayName": "PublicIPAddress"
+        },
+        "properties": {
+            "publicIPAllocationMethod": "Dynamic",
+            "dnsSettings": {
+                "domainNameLabel": "[toLower('uccseyhansvm')]"
+            }
+        }
+    },
+    {
+        "name": "uccseyhansvm-nsg",
+        "type": "Microsoft.Network/networkSecurityGroups",
+        "apiVersion": "2020-11-01",
+        "location": "[resourceGroup().location]",
+        "properties": {
+            "securityRules": [
+                {
+                    "name": "nsgRule1",
+                    "properties": {
+                        "description": "description",
+                        "protocol": "Tcp",
+                        "sourcePortRange": "*",
+                        "destinationPortRange": "22",
+                        "sourceAddressPrefix": "*",
+                        "destinationAddressPrefix": "*",
+                        "access": "Allow",
+                        "priority": 100,
+                        "direction": "Inbound"
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "name": "uccseyhansvm-VirtualNetwork",
+        "type": "Microsoft.Network/virtualNetworks",
+        "apiVersion": "2020-11-01",
+        "location": "[resourceGroup().location]",
+        "dependsOn": [
+            "[resourceId('Microsoft.Network/networkSecurityGroups', 'uccseyhansvm-nsg')]"
+        ],
+        "tags": {
+            "displayName": "uccseyhansvm-VirtualNetwork"
+        },
+        "properties": {
+            "addressSpace": {
+                "addressPrefixes": [
+                    "10.0.0.0/16"
+                ]
+            },
+            "subnets": [
+                {
+                    "name": "uccseyhansvm-VirtualNetwork-Subnet",
+                    "properties": {
+                        "addressPrefix": "10.0.0.0/24",
+                        "networkSecurityGroup": {
+                            "id": "[resourceId('Microsoft.Network/networkSecurityGroups', 'uccseyhansvm-nsg')]"
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "name": "uccseyhansvm-NetworkInterface",
+        "type": "Microsoft.Network/networkInterfaces",
+        "apiVersion": "2020-11-01",
+        "location": "[resourceGroup().location]",
+        "dependsOn": [
+            "[resourceId('Microsoft.Network/publicIPAddresses', 'uccseyhansvm-PublicIP')]",
+            "[resourceId('Microsoft.Network/virtualNetworks', 'uccseyhansvm-VirtualNetwork')]"
+        ],
+        "tags": {
+            "displayName": "uccseyhansvm-NetworkInterface"
+        },
+        "properties": {
+            "ipConfigurations": [
+                {
+                    "name": "ipConfig1",
+                    "properties": {
+                        "privateIPAllocationMethod": "Dynamic",
+                        "publicIPAddress": {
+                            "id": "[resourceId('Microsoft.Network/publicIPAddresses', 'uccseyhansvm-PublicIP')]"
+                        },
+                        "subnet": {
+                            "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', 'uccseyhansvm-VirtualNetwork', 'uccseyhansvm-VirtualNetwork-Subnet')]"
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "name": "[variables('Ubuntu Vms name')]",
+        "type": "Microsoft.Compute/virtualMachines",
+        "apiVersion": "2021-03-01",
+        "location": "[resourceGroup().location]",
+        "dependsOn": [
+            "[resourceId('Microsoft.Network/networkInterfaces', 'uccseyhansvm-NetworkInterface')]"
+        ],
+        "tags": {
+            "displayName": "[variables('Ubuntu Vms name')]"
+        },
+        "properties": {
+            "hardwareProfile": {
+                "vmSize": "Standard_A2_v2"
+            },
+            "osProfile": {
+                "computerName": "[variables('Ubuntu Vms name')]",
+                "adminUsername": "[variables('Both VMs user name')]",
+                "adminPassword": "[variables('Both Vms password')]"
+            },
+            "storageProfile": {
+                "imageReference": {
+                    "publisher": "Canonical",
+                    "offer": "UbuntuServer",
+                    "sku": "16.04-LTS",
+                    "version": "latest"
+                },
+                "osDisk": {
+                    "name": "uccseyhansvm-OSDisk",
+                    "caching": "ReadWrite",
+                    "createOption": "FromImage"
+                }
+            },
+            "networkProfile": {
+                "networkInterfaces": [
+                    {
+                        "id": "[resourceId('Microsoft.Network/networkInterfaces', 'uccseyhansvm-NetworkInterface')]"
+                    }
+                ]
+            },
+            "diagnosticsProfile": {
+                "bootDiagnostics": {
+                    "enabled": true,
+                    "storageUri": "[reference(resourceId('Microsoft.Storage/storageAccounts/', toLower('uccseyhansvmstorage'))).primaryEndpoints.blob]"
+                }
+            }
+        }
+    }],
+    "outputs": {}
+}
